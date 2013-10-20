@@ -6,11 +6,42 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXFileReference section */
+		D8CA0F191717A52F00CE9BE0 /* servoboard_test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = servoboard_test.c; sourceTree = "<group>"; };
+		D8CA0F1C1717A58F00CE9BE0 /* lm4f120.ld */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = lm4f120.ld; sourceTree = "<group>"; };
+		D8CA0F1D1717A58F00CE9BE0 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		D8CA0F1E1717A58F00CE9BE0 /* startup_gcc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = startup_gcc.c; sourceTree = "<group>"; };
+		D8CA0F1F1717A5B300CE9BE0 /* servo-wt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "servo-wt.c"; path = "../stellaris_drivers/servo-wt.c"; sourceTree = "<group>"; };
+		D8CA0F201717A5B300CE9BE0 /* servo-wt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "servo-wt.h"; path = "../stellaris_drivers/servo-wt.h"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
 /* Begin PBXGroup section */
 		D8CA0F0E1717A4CE00CE9BE0 = {
 			isa = PBXGroup;
 			children = (
+				D8CA0F1B1717A57900CE9BE0 /* support */,
+				D8CA0F1A1717A56400CE9BE0 /* stellaris_drivers */,
+				D8CA0F191717A52F00CE9BE0 /* servoboard_test.c */,
 			);
+			sourceTree = "<group>";
+		};
+		D8CA0F1A1717A56400CE9BE0 /* stellaris_drivers */ = {
+			isa = PBXGroup;
+			children = (
+				D8CA0F1F1717A5B300CE9BE0 /* servo-wt.c */,
+				D8CA0F201717A5B300CE9BE0 /* servo-wt.h */,
+			);
+			name = stellaris_drivers;
+			sourceTree = "<group>";
+		};
+		D8CA0F1B1717A57900CE9BE0 /* support */ = {
+			isa = PBXGroup;
+			children = (
+				D8CA0F1C1717A58F00CE9BE0 /* lm4f120.ld */,
+				D8CA0F1D1717A58F00CE9BE0 /* Makefile */,
+				D8CA0F1E1717A58F00CE9BE0 /* startup_gcc.c */,
+			);
+			name = support;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -40,7 +71,6 @@
 			};
 			buildConfigurationList = D8CA0F121717A4CE00CE9BE0 /* Build configuration list for PBXProject "servoboard_test" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
@@ -152,6 +182,7 @@
 				D8CA0F181717A4CE00CE9BE0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
