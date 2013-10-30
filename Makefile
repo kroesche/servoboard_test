@@ -77,7 +77,7 @@ FPU=
 endif
 
 # stellaris standard C flags
-CFLAGS=-mthumb ${CPU} ${FPU} -Os -ffunction-sections -fdata-sections -MD -std=c99 -Wall -pedantic
+CFLAGS=-g -mthumb ${CPU} ${FPU} -Os -ffunction-sections -fdata-sections -MD -std=c99 -Wall -pedantic
 
 # stellaris standard linker flags
 LDFLAG=--gc-sections

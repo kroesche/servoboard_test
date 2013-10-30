@@ -1,8 +1,26 @@
+/******************************************************************************
+ *
+ * servo-wt.c - Servo (wide timer) driver for TI Stellaris microcontroller
+ *
+ * Copyright (c) 2013, Joseph Kroesche (kroesche.org)
+ * All rights reserved.
+ *
+ * This software is released under the FreeBSD license, found in the
+ * accompanying file LICENSE.txt and at the following URL:
+ *      http://www.freebsd.org/copyright/freebsd-license.html
+ *
+ * This software is provided as-is and without warranty.
+ *
+ *****************************************************************************/
 
+/* Library headers
+ */
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
+/* StellarisWare headers
+ */
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_ints.h"
@@ -13,23 +31,51 @@
 #include "driverlib/gpio.h"
 #include "driverlib/interrupt.h"
 
-
 #include "utils/uartstdio.h"
 #include "utils/ustdlib.h"
 
+/* Servo driver header
+ */
 #include "stellaris_drivers/servo-wt.h"
 
+/******************************************************************************
+ *
+ * This file contains a simple test program to exercise the 12-servo
+ * booster pack.  It is meant to be used as part of the test procedure
+ * for the board.
+ */
+
+/******************************************************************************
+ *
+ * Macros and locals
+ *
+ *****************************************************************************/
+
+/* Define the number of servos used
+ */
 #define NUM_SERVOS 12
+
+/* Holds a servo handle for each servo index
+ */
 static ServoHandle_t hServo[NUM_SERVOS];
-static uint32_t gSysClock;
+
+/* This is a bit mask to track which servos are in motion.  Each bit
+ * represents one servo.  If the bit is 1 it means the servo is in
+ * motion.
+ */
 static volatile uint32_t gInMotion;
 
+/* This structure holds the timer and timer half used for each servo
+ */
 typedef struct
 {
     int32_t timer;
     int32_t half;
 } ServoInfo_t;
 
+/* Table that maps each servo index (0, 1, 2, etc) to a specific
+ * hardware timer instance
+ */
 static const ServoInfo_t servoInfo[NUM_SERVOS] =
 {
     {   4, SERVO_TIMER_A },
@@ -46,59 +92,54 @@ static const ServoInfo_t servoInfo[NUM_SERVOS] =
     {   0, SERVO_TIMER_B },
 };
 
-#define S0 (1 << 0)
-#define S1 (1 << 1)
-#define S2 (1 << 2)
-#define S3 (1 << 3)
-#define S4 (1 << 4)
-#define S5 (1 << 5)
-#define S6 (1 << 6)
-#define S7 (1 << 7)
-#define S8 (1 << 8)
-#define S9 (1 << 9)
-#define S10 (1 << 10)
-#define S11 (1 << 11)
+/* Defines the RGB pins and color combinations
+ */
+#define RGB_RED GPIO_PIN_1
+#define RGB_BLU GPIO_PIN_2
+#define RGB_GRN GPIO_PIN_3
+#define RGB_YEL (RGB_GRN | RGB_RED)
+#define RGB_PINS (RGB_RED | RGB_BLU | RGB_GRN)
 
-#define HIP_A1 0
-#define HIP_A2 4
-#define HIP_A3 8
-#define HIP_B1 2
-#define HIP_B2 6
-#define HIP_B3 10
-#define HIP_ALL (S0|S4|S8|S2|S6|S10)
-#define FEET_A (S1|S5|S9)
-#define FEET_B (S3|S7|S11)
-#define FEET_ALL (FEET_A|FEET_B)
-#define FOOT_UP 450
-#define FOOT_DOWN -50
-#define HIP_A1_FORWARD 0
-#define HIP_A2_FORWARD 500
-#define HIP_A3_FORWARD 250
-#define HIP_A1_BACK -500
-#define HIP_A2_BACK 0
-#define HIP_A3_BACK -250
-#define HIP_B1_FORWARD 250
-#define HIP_B2_FORWARD 500
-#define HIP_B3_FORWARD 0
-#define HIP_B1_BACK -250
-#define HIP_B2_BACK 0
-#define HIP_B3_BACK -500
-#define FOOT_A1 1
-#define FOOT_B1 3
-#define FOOT_A2 5
-#define FOOT_B2 7
-#define FOOT_A3 9
-#define FOOT_B3 11
+/* Holds the system clock frequency
+ */
+static uint32_t gSysClock;
 
-#define STATE_IDLE 1
-#define STATE_WALKING 2
-#define STATE_ENDWALK 3
-#define STATE_TRICK1 4
-#define STATE_TRICK2 5
-#define STATE_TRICK2_CONTINUE 6
+/******************************************************************************
+ *
+ * Private Functions
+ *
+ *****************************************************************************/
 
+/*
+ * Read the battery ADC and update the RGB color to indicate if
+ * the battery voltage is in range of 8V +/- 0.1V
+ */
+static void
+UpdateRGB(void)
+{
+    uint32_t bat = Servo_ReadBatteryMv();
+    if(bat < 7900)
+    {
+        GPIOPinWrite(GPIO_PORTF_BASE, RGB_PINS, RGB_BLU);
+    }
+    else if(bat > 8100)
+    {
+        GPIOPinWrite(GPIO_PORTF_BASE, RGB_PINS, RGB_RED);
+    }
+    else
+    {
+        GPIOPinWrite(GPIO_PORTF_BASE, RGB_PINS, RGB_GRN);
+    }
+}
 
-
+/*
+ * Motion callback for servo move commands
+ *
+ * @param pData is the callback data, which is the servo index
+ *
+ * This function is called back whenever a servo move is complete.  It
+ * is used to clear the "in-motion" bit for the servo that finished moving.
+ */
 static void
 MotionCallback(void *pData)
 {
@@ -106,6 +147,14 @@ MotionCallback(void *pData)
     HWREGBITW(&gInMotion, servo) = 0;
 }
 
+/*
+ * Wait until a specific servo has stopped moving.
+ *
+ * @param servo is the servo number to wait on
+ *
+ * This function will poll-wait until the specified servo has stoped
+ * moving.
+ */
 static void
 WaitOne(uint32_t servo)
 {
@@ -113,13 +162,32 @@ WaitOne(uint32_t servo)
     {}
 }
 
+/*
+ * Wait until multiple servos have stopped moving
+ *
+ * @param mask is a bit mask of servos to wait on
+ *
+ * This function will poll-wait until all of the servos specified in the
+ * bit mask have finished moving.
+ */
+#if 0 // set to 1 if needed
 static void
 WaitAll(uint32_t mask)
 {
     while(gInMotion & mask)
     {}
 }
+#endif
 
+/*
+ * Move one servo to a specified position in centi-deg
+ *
+ * @param servo is the servo index to move
+ * @param cdeg is the new position in centi-deg
+ *
+ * This function will command the specified servo to move to the
+ * new position.  It does not wait for the motion to complete.
+ */
 static void
 MoveOne(uint32_t servo, int32_t cdeg)
 {
@@ -128,6 +196,16 @@ MoveOne(uint32_t servo, int32_t cdeg)
     Servo_Move(hServo[servo], cdeg, MotionCallback, (void *)servo);
 }
 
+/*
+ * Move multiple servos to a specified position
+ *
+ * @param mask is a bit mask of all the servos to move
+ * @param cdeg is the new position in centi-deg
+ *
+ * This function will command multiple servos to move to a specific
+ * position.  It does not wait for the motion to complete.
+ */
+#if 0 // set to 1 if function is used
 static void
 MoveAll(uint32_t mask, int32_t cdeg)
 {
@@ -139,200 +217,41 @@ MoveAll(uint32_t mask, int32_t cdeg)
         }
     }
 }
+#endif
 
+/*
+ * Poll-wait delay in milliseconds
+ *
+ * @param msecs is the delay time in milliseconds
+ *
+ * This funtion will wait a specified number of milliseconds, using
+ * a polling loop.
+ */
 void
-TripodGait(uint32_t count)
+DelayMs(uint32_t msecs)
 {
-    while(count--)
-    {
-        // wait for all done
-        WaitAll(0xFFF);
-        
-        // A foot down, wait
-        MoveAll(FEET_A, FOOT_DOWN);
-        WaitAll(FEET_A);
-        
-        // B foot up, wait
-        MoveAll(FEET_B, FOOT_UP);
-        WaitAll(FEET_B);
-        
-        // A hip back
-        MoveOne(HIP_A1, HIP_A1_BACK);
-        MoveOne(HIP_A2, HIP_A2_BACK);
-        MoveOne(HIP_A3, HIP_A3_BACK);
-        //                WaitAll(0xFFF);
-        // B hip forward
-        MoveOne(HIP_B1, HIP_B1_FORWARD);
-        MoveOne(HIP_B2, HIP_B2_FORWARD);
-        MoveOne(HIP_B3, HIP_B3_FORWARD);
-        
-        WaitAll(0xFFF);
-        
-        // B foot down, wait
-        MoveAll(FEET_B, FOOT_DOWN);
-        WaitAll(FEET_B);
-        
-        // A foot up, wait
-        MoveAll(FEET_A, FOOT_UP);
-        WaitAll(FEET_A);
-        
-        // B hip back
-        MoveOne(HIP_B1, HIP_B1_BACK);
-        MoveOne(HIP_B2, HIP_B2_BACK);
-        MoveOne(HIP_B3, HIP_B3_BACK);
-        //                WaitAll(0xFFF);
-        // A hip forward
-        MoveOne(HIP_A1, HIP_A1_FORWARD);
-        MoveOne(HIP_A2, HIP_A2_FORWARD);
-        MoveOne(HIP_A3, HIP_A3_FORWARD);
-    }
-    WaitAll(0xFFF);
-    MoveAll(0xFFF, 0);
-    WaitAll(0xFFF);
+    SysCtlDelay(((gSysClock / 1000) * msecs) / 3);
 }
 
-void
-LeftRight(uint32_t count)
-{
-    MoveAll(FEET_ALL, 850);
-    while(count--)
-    {
-        WaitAll(0xFFF);
-        
-        MoveAll(HIP_ALL, 450);
-        WaitAll(HIP_ALL);
-        MoveAll(HIP_ALL, -450);
-    }
-    WaitAll(0xFFF);
-    MoveAll(0xFFF, 0);
-    WaitAll(0xFFF);
-}
-
-void
-UpDown(uint32_t count)
-{
-    MoveAll(0xFFF, 0);
-    while(count--)
-    {
-        WaitAll(0xFFF);
-        
-        MoveAll(FEET_ALL, 1050);
-        WaitAll(FEET_ALL);
-        MoveAll(FEET_ALL, -450);
-    }
-    WaitAll(0xFFF);
-    MoveAll(0xFFF, 0);
-    WaitAll(0xFFF);
-}
-
-void
-Wave(uint32_t count)
-{
-    MoveAll(HIP_ALL, 0);
-    MoveAll(FEET_ALL, 700);
-    WaitAll(0xFFF);
-    SysCtlDelay(gSysClock);
-    
-    while(count--)
-    {
-        MoveOne(FOOT_A1, 1050);
-        MoveOne(FOOT_B3, 700);
-        WaitOne(FOOT_A1);
-        
-        MoveOne(FOOT_B1, 1050);
-        MoveOne(FOOT_A1, 700);
-        WaitOne(FOOT_B1);
-        
-        MoveOne(FOOT_A2, 1050);
-        MoveOne(FOOT_B1, 700);
-        WaitOne(FOOT_A2);
-        
-        MoveOne(FOOT_B2, 1050);
-        MoveOne(FOOT_A2, 700);
-        WaitOne(FOOT_B2);
-        
-        MoveOne(FOOT_A3, 1050);
-        MoveOne(FOOT_B2, 700);
-        WaitOne(FOOT_A3);
-        
-        MoveOne(FOOT_B3, 1050);
-        MoveOne(FOOT_A3, 700);
-        WaitOne(FOOT_B3);
-    }
-    WaitAll(0xFFF);
-    MoveAll(0xFFF, 0);
-    WaitAll(0xFFF);
-}
-
-void
-HipsLeft(void)
-{
-    MoveAll(HIP_ALL, 450);
-    WaitAll(HIP_ALL);
-}
-
-void
-HipsRight(void)
-{
-    MoveAll(HIP_ALL, -450);
-    WaitAll(HIP_ALL);
-}
-
-void
-HipsCenter(void)
-{
-    MoveAll(HIP_ALL, 0);
-    WaitAll(HIP_ALL);
-}
-
-void
-FeetUp(void)
-{
-    MoveAll(FEET_ALL, 500);
-    WaitAll(FEET_ALL);
-}
-
-void
-FeetUpHigh(void)
-{
-    MoveAll(FEET_ALL, 1050);
-    WaitAll(FEET_ALL);
-}
-
-void
-FeetDown(void)
-{
-    MoveAll(FEET_ALL, 100);
-    WaitAll(FEET_ALL);
-}
-
-void
-FeetIn(void)
-{
-    MoveAll(FEET_ALL, -450);
-    WaitAll(FEET_ALL);
-}
-
-void
-Delay(uint32_t secs)
-{
-    SysCtlDelay((gSysClock * secs) / 3);
-}
-
+/******************************************************************************
+ *
+ * Test program
+ *
+ *****************************************************************************/
 int
 main(void)
 {
     int ret;
-    
+
     FPUStackingDisable();
     
-    // 40 MHz
+    /* Initialize the clock to run at 40 MHz
+     */
     SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
     gSysClock = SysCtlClockGet();
-    
-    //
-    // Initialize the UART.
-    //
+
+    /* Initialize the UART.
+     */
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
     GPIOPinConfigure(GPIO_PA0_U0RX);
     GPIOPinConfigure(GPIO_PA1_U0TX);
@@ -340,7 +259,16 @@ main(void)
     UARTStdioInit(0);
     
     UARTprintf("\n\nServoBoard-Test\n---------------\n");
-    
+
+    /* Initialize the GPIO port for the RGB LED
+     */
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, RGB_PINS);
+    GPIOPinWrite(GPIO_PORTF_BASE, RGB_PINS, 0);
+
+    /* Initialize the battery monitor
+     * Use zeroes for parameter so default calibration will be used
+     */
     Servo_BatteryInit(0, 0);
     
     /* Initialize servos for 20 msec
@@ -351,88 +279,72 @@ main(void)
         UARTprintf("error calling ServoInit\n");
         return 0;
     }
-    
+
+    /* Enter loop to initialize all the servos in the system
+     */
     for(int servo = 0; servo < NUM_SERVOS; servo++)
     {
+        /* Associate each servo ID with a hardware timer (and A or B half)
+         */
         hServo[servo] = Servo_Config(servoInfo[servo].timer, servoInfo[servo].half);
         if(hServo[servo] == 0)
         {
             UARTprintf("error config servo %d\n", servo);
             return 0;
         }
-        Servo_SetMotionParameters(hServo[servo], 140);
+
+        /* Delay a bit before initting the next servo.  This is done to
+         * spread out the servo pulses so they do not all happen at the
+         * same time and load down the power supply.
+         * The delay value was determined experimentally.  If the
+         * system clock frequency is changed then the delay value needs to
+         * be changed
+         */
         SysCtlDelay(22000);
     }
     
-    for(int servo = 1; servo < NUM_SERVOS; servo += 2)
-    {
-        Servo_Calibrate(hServo[servo], 1000, 1800, 1);
-    }
-#if 0
-    Servo_Calibrate(hServo[5], 1000, 1900, 1);
-    
-    Servo_Calibrate(hServo[6], 1000, 1500, 1);
-    Servo_Calibrate(hServo[8], 1000, 1500, 1);
-    Servo_Calibrate(hServo[10], 1000, 1500, 1);
-#endif
-    
+    /* Set each servo position to 0 to start, with 100 ms delay
+     */
     for(int servo = 0; servo < NUM_SERVOS; servo++)
     {
+        /* Set the servo motion rate */
+        Servo_SetMotionParameters(hServo[servo], 200);
         Servo_SetPosition(hServo[servo], 0);
         SysCtlDelay((gSysClock / 10) / 3);
     }
+
+
+    // MoveAll(0xFFF, 0);
     
-    MoveAll(0xFFF, 0);
-    
-    /*
-     * PrepStep
-     * -foot up
-     * -wait
-     * -hip forward
-     *
-     * MakeStep
-     * -foot down
-     * -wait
-     * -hip back
+    /* In this loop we just move all the servos between +45 and
+     * -45 deg (uncalibrated).  There is a 100 ms delay between each
+     * servo, so that if observed with a scope each servo does not have
+     * the exact same timing.
      */
     while(1)
     {
-        Delay(5);
-        FeetUp();
-        Delay(2);
-        FeetUpHigh();
-        Delay(2);
-        FeetDown();
-        Delay(5);
-        FeetIn();
-        Delay(5);
-        FeetDown();
-        Delay(2);
-        HipsLeft();
-        Delay(2);
-        HipsCenter();
-        Delay(2);
-        HipsRight();
-        Delay(2);
-        HipsCenter();
-        Delay(15);
+        /* Move all servos to -45 deg, with 100 ms between each servo
+         */
+        for(int servo = 0; servo < NUM_SERVOS; servo++)
+        {
+            UpdateRGB();
+            MoveOne(servo, -450);
+            DelayMs(100);
+        }
 
-        UpDown(3);
-        Delay(15);
-        Wave(4);
-        Delay(15);
-        LeftRight(2);
-        Delay(10);
-        
-        TripodGait(5);
-        Delay(10);
-        
+        /* Now move all servos to +45 deg, with 100 ms delay
+         */
+        for(int servo = 0; servo < NUM_SERVOS; servo++)
+        {
+            UpdateRGB();
+            MoveOne(servo, 450);
+            DelayMs(100);
+        }
+
+        /* Read the battery voltage and print to the terminal
+         */
         uint32_t bat = Servo_ReadBatteryMv();
         UARTprintf("%u.%02u V\n", bat / 1000, (bat % 1000) / 10);
-//        usnprintf(gDispStringBuf, sizeof(gDispStringBuf), "  BAT: %u.%02u V  ", bat / 1000, (bat % 1000) / 10);
-        //        uint32_t bat = BatmonReadRaw();
-        //        usnprintf(gDispStringBuf, sizeof(gDispStringBuf), "   %u   ", bat);
-//        usnprintf(gDispStringBuf, sizeof(gDispStringBuf), "   %s   ", stateString);
     }
     
     return(0);
