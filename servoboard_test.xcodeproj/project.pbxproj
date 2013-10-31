@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		D894EC8B1820C29300CF9ADE /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = README.md; sourceTree = "<group>"; };
+		D894EC8C1820C29300CF9ADE /* LICENSE.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
 		D8CA0F191717A52F00CE9BE0 /* servoboard_test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = servoboard_test.c; sourceTree = "<group>"; };
 		D8CA0F1C1717A58F00CE9BE0 /* lm4f120.ld */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = lm4f120.ld; sourceTree = "<group>"; };
 		D8CA0F1D1717A58F00CE9BE0 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
@@ -37,6 +39,8 @@
 		D8CA0F1B1717A57900CE9BE0 /* support */ = {
 			isa = PBXGroup;
 			children = (
+				D894EC8B1820C29300CF9ADE /* README.md */,
+				D894EC8C1820C29300CF9ADE /* LICENSE.txt */,
 				D8CA0F1C1717A58F00CE9BE0 /* lm4f120.ld */,
 				D8CA0F1D1717A58F00CE9BE0 /* Makefile */,
 				D8CA0F1E1717A58F00CE9BE0 /* startup_gcc.c */,
@@ -71,6 +75,7 @@
 			};
 			buildConfigurationList = D8CA0F121717A4CE00CE9BE0 /* Build configuration list for PBXProject "servoboard_test" */;
 			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
