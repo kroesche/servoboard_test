@@ -22,7 +22,7 @@ This test application, called servoboard_test, is meant to be used for testing t
 
 Test Procedure
 ==============
-This is a *quick overview* of the procedure.  You should review the full test procedure document found here **TBD**.
+This is a *quick overview* of the procedure.  You should review the full test procedure document found in the [doc](https://github.com/kroesche/servoboard_test/blob/master/doc) directory.
 
 0. This procedure assumes you have already loaded the test program onto the LaunchPad.
 1. With the 12-servo BoosterPack not plugged into the LaunchPad, apply 6V power supply to the power connector.
