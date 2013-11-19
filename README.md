@@ -24,7 +24,7 @@ Test Procedure
 ==============
 This is a *quick overview* of the procedure.  You should review the full test procedure document found here **TBD**.
 
-0. This procedure assumes you have already loaded the test program onto the LauncPad.
+0. This procedure assumes you have already loaded the test program onto the LaunchPad.
 1. With the 12-servo BoosterPack not plugged into the LaunchPad, apply 6V power supply to the power connector.
 2. Use the 5V connector J10 to verify the on-board power supply is 5V.
 3. Vary the input power supply from 6-12V.  Verify the on-board power supply remains at 5V.
