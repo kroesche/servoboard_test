@@ -40,4 +40,4 @@ This is a *quick overview* of the procedure.  You should review the full test pr
 
 Pre-built Binary
 ================
-You can find a pre-built binary of this application in the **gcc** directory.
+You can find a pre-built binary of this application in the [gcc](https://github.com/kroesche/servoboard_test/tree/master/gcc) directory.

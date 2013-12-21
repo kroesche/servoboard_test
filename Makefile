@@ -1,3 +1,30 @@
+###############################################################################
+#
+# Makefile - Makefile for servoboard_test program
+#
+# Copyright (c) 2013, Joseph Kroesche (kroesche.org)
+# All rights reserved.
+#
+# This software is released under the FreeBSD license, found in the
+# accompanying file LICENSE.txt and at the following URL:
+#      http://www.freebsd.org/copyright/freebsd-license.html
+#
+# This software is provided as-is and without warranty.
+#
+###############################################################################
+
+# By default this application is built using TivaWare.  If you want to use
+# StellarisWare instead, then uncomment the following line
+#
+# USE_STELLARISWARE=1
+
+# path to StellarisWare or TivaWare installed on the system
+# You can also set this in the environment which will override this value
+ifeq (${USE_STELLARISWARE}, 1)
+TIVAWARE_ROOT?=/Users/joe/Documents/Projects/tronics/ti/StellarisWare-LM3S-LM4F-9453
+else
+TIVAWARE_ROOT?=/Users/joe/Documents/Projects/tronics/ti/TivaWare_C_Series_2.0.1.11577
+endif
 
 # name of the program
 APPNAME=servoboard_test
@@ -6,36 +33,45 @@ APPNAME=servoboard_test
 SRCS=servoboard_test.c
 SRCS+=startup_gcc.c
 SRCS+=../stellaris_drivers/servo-wt.c
-SRCS+=${STELLARISWARE_ROOT}/utils/uartstdio.c
-SRCS+=${STELLARISWARE_ROOT}/utils/ustdlib.c
+SRCS+=${TIVAWARE_ROOT}/utils/uartstdio.c
+SRCS+=${TIVAWARE_ROOT}/utils/ustdlib.c
 
 # make search path for source files
 VPATH=../stellaris_drivers
-VPATH+=${STELLARISWARE_ROOT}/utils
+VPATH+=${TIVAWARE_ROOT}/utils
 
 # list of all the include paths
 INCLUDES=-I.
-INCLUDES+=-I${STELLARISWARE_ROOT}
+INCLUDES+=-I${TIVAWARE_ROOT}
 INCLUDES+=-I..
 
 # list of libraries to include in the link
-LIBS=${STELLARISWARE_ROOT}/driverlib/gcc-${CORTEXM}/libdriver-${CORTEXM}.a
+ifeq (${USE_STELLARISWARE}, 1)
+LIBS=${TIVAWARE_ROOT}/driverlib/gcc-${CORTEXM}/libdriver-${CORTEXM}.a
+else
+LIBS=${TIVAWARE_ROOT}/driverlib/gcc/libdriver.a
+endif
 
 # defines the part number
-PART=LM4F120H5QR
+ifeq (${USE_STELLARISWARE}, 1)
+PART=LM4F120H5QR # this line is for StellarisWare
+else
+PART=TM4C123GH6PM # this line is for TivaWare
+endif
 
 # defines the part class.  this is used for ROM calls.  this can be left
 # blank if ROM not used
-PART_CLASS=-DTARGET_IS_BLIZZARD_RA2
+ifeq (${USE_STELLARISWARE}, 1)
+PART_CLASS=-DTARGET_IS_BLIZZARD_RA2 # this line is for StellarisWare
+else
+PART_CLASS=-DTARGET_IS_BLIZZARD_RA3 # this line is for TivaWare
+endif
 
 # the type of CORTEX-M, either cm3 or cm4f
 CORTEXM=cm4f
 
-# path to StellarisWare installed on the system
-STELLARISWARE_ROOT=/Users/joe/Dev/StellarisWare
-
 # the name of the linker script
-LDSCRIPT=lm4f120.ld
+LDSCRIPT=tm4c123.ld
 
 # name of entry point
 ENTRY=ResetISR
@@ -51,13 +87,14 @@ MAPFILE=${OUT}${APPNAME}.map
 # you may be able to leave this blank.  However, if using xcode to invoke
 # the makefile, it is hard to make xcode find your compiler even when on the
 # path so I defined it here.
+# This can also be set in the environment.
 #
-TOOLPATH=/usr/local/gcc-arm-none-eabi-4_7-2012q4/bin/
+TOOLPATH?=/usr/local/gcc-arm-none-eabi-4_7-2013q3/bin/
 
 # prefix name for tool chain
 TOOLCHAIN=arm-none-eabi
 
-# part definition macro needed by some StellarisWare files
+# part definition macro needed by some TivaWare/StellarisWare files
 PARTMACRO=PART_${PART}
 
 # define the tools program names
@@ -78,6 +115,12 @@ endif
 
 # stellaris standard C flags
 CFLAGS=-g -mthumb ${CPU} ${FPU} -Os -ffunction-sections -fdata-sections -MD -std=c99 -Wall -pedantic
+
+# Set a macro that can be used by the source code to detect if
+# StellarisWare is being used
+ifeq (${USE_STELLARISWARE}, 1)
+CFLAGS+=-DSTELLARISWARE
+endif
 
 # stellaris standard linker flags
 LDFLAG=--gc-sections

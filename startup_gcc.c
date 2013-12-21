@@ -2,25 +2,25 @@
 //
 // startup_gcc.c - Startup code for use with GNU tools.
 //
-// Copyright (c) 2009-2012 Texas Instruments Incorporated.  All rights reserved.
+// Copyright (c) 2013 Texas Instruments Incorporated.  All rights reserved.
 // Software License Agreement
-//
+// 
 //   Redistribution and use in source and binary forms, with or without
 //   modification, are permitted provided that the following conditions
 //   are met:
-//
+// 
 //   Redistributions of source code must retain the above copyright
 //   notice, this list of conditions and the following disclaimer.
-//
+// 
 //   Redistributions in binary form must reproduce the above copyright
 //   notice, this list of conditions and the following disclaimer in the
-//   documentation and/or other materials provided with the
+//   documentation and/or other materials provided with the  
 //   distribution.
-//
+// 
 //   Neither the name of Texas Instruments Incorporated nor the names of
 //   its contributors may be used to endorse or promote products derived
 //   from this software without specific prior written permission.
-//
+// 
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -32,20 +32,14 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// 
+// This is part of revision 2.0.1.11577 of the Tiva Firmware Development Package.
 //
 //*****************************************************************************
 
-//
-// This file came from the Energia github project
-// https://github.com/energia/Energia/blob/master/hardware/lm4f/cores/lm4f/startup_gcc.c
-//
-// It was supplied to Energia by TI with the above BSD style license
-//
-// I made minor modifications to remove Energia specific pieces
-// and to remove the cpp stuff
-
-#include "inc/hw_types.h"
+#include <stdint.h>
 #include "inc/hw_nvic.h"
+#include "inc/hw_types.h"
 
 //*****************************************************************************
 //
@@ -78,10 +72,11 @@ extern void WTimer5AIntHandler(void);
 extern void WTimer5BIntHandler(void);
 
 //*****************************************************************************
-// System stack start determined by ldscript, normally highest ram address
+//
+// Reserve space for the system stack.
+//
 //*****************************************************************************
-//extern unsigned _estack;
-static unsigned long pulStack[256];
+static uint32_t pui32Stack[64];
 
 //*****************************************************************************
 //
@@ -89,12 +84,11 @@ static unsigned long pulStack[256];
 // ensure that it ends up at physical address 0x0000.0000.
 //
 //*****************************************************************************
-
 __attribute__ ((section(".isr_vector")))
 void (* const g_pfnVectors[])(void) =
 {
-    (void (*)(void))((unsigned long)pulStack + sizeof(pulStack)),
-//    (unsigned char*)&_estack, // The initial stack pointer, 0x20008000 32K
+    (void (*)(void))((uint32_t)pui32Stack + sizeof(pui32Stack)),
+                                            // The initial stack pointer
     ResetISR,                               // The reset handler
     NmiSR,                                  // The NMI handler
     FaultISR,                               // The hard fault handler
@@ -152,7 +146,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // CAN0
     IntDefaultHandler,                      // CAN1
     IntDefaultHandler,                      // CAN2
-    IntDefaultHandler,                      // Ethernet
+    0,                                      // Reserved
     IntDefaultHandler,                      // Hibernate
     IntDefaultHandler,                      // USB0
     IntDefaultHandler,                      // PWM Generator 3
@@ -162,8 +156,8 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC1 Sequence 1
     IntDefaultHandler,                      // ADC1 Sequence 2
     IntDefaultHandler,                      // ADC1 Sequence 3
-    IntDefaultHandler,                      // I2S0
-    IntDefaultHandler,                      // External Bus Interface 0
+    0,                                      // Reserved
+    0,                                      // Reserved
     IntDefaultHandler,                      // GPIO Port J
     IntDefaultHandler,                      // GPIO Port K
     IntDefaultHandler,                      // GPIO Port L
@@ -258,11 +252,11 @@ void (* const g_pfnVectors[])(void) =
 // for the "data" segment resides immediately following the "text" segment.
 //
 //*****************************************************************************
-extern unsigned long _etext;
-extern unsigned long _data;
-extern unsigned long _edata;
-extern unsigned long _bss;
-extern unsigned long _ebss;
+extern uint32_t _etext;
+extern uint32_t _data;
+extern uint32_t _edata;
+extern uint32_t _bss;
+extern uint32_t _ebss;
 
 //*****************************************************************************
 //
@@ -274,44 +268,51 @@ extern unsigned long _ebss;
 // application.
 //
 //*****************************************************************************
-void ResetISR(void) {
-    unsigned long *pulSrc, *pulDest;
-    
+void
+ResetISR(void)
+{
+    uint32_t *pui32Src, *pui32Dest;
+
     //
     // Copy the data segment initializers from flash to SRAM.
     //
-    pulSrc = &_etext;
-    for (pulDest = &_data; pulDest < &_edata;) {
-        *pulDest++ = *pulSrc++;
+    pui32Src = &_etext;
+    for(pui32Dest = &_data; pui32Dest < &_edata; )
+    {
+        *pui32Dest++ = *pui32Src++;
     }
-    
+
     //
     // Zero fill the bss segment.
     //
-    __asm(  "    ldr     r0, =_bss\n"
+    __asm("    ldr     r0, =_bss\n"
           "    ldr     r1, =_ebss\n"
           "    mov     r2, #0\n"
           "    .thumb_func\n"
-          "1:\n"
-          "    cmp     r0, r1\n"
-          "    it      lt\n"
-          "    strlt   r2, [r0], #4\n"
-          "    blt     1b"
-          );
-    
+          "zero_loop:\n"
+          "        cmp     r0, r1\n"
+          "        it      lt\n"
+          "        strlt   r2, [r0], #4\n"
+          "        blt     zero_loop");
+
     //
-    // Enable the floating-point unit before calling c++ ctors
+    // Enable the floating-point unit.  This must be done here to handle the
+    // case where main() uses floating-point and the function prologue saves
+    // floating-point registers (which will fault if floating-point is not
+    // enabled).  Any configuration of the floating-point unit using DriverLib
+    // APIs must be done here prior to the floating-point unit being enabled.
     //
-    
+    // Note that this does not use DriverLib since it might not be included in
+    // this project.
+    //
     HWREG(NVIC_CPAC) = ((HWREG(NVIC_CPAC) &
                          ~(NVIC_CPAC_CP10_M | NVIC_CPAC_CP11_M)) |
                         NVIC_CPAC_CP10_FULL | NVIC_CPAC_CP11_FULL);
-    
+
     //
-    // call 'C' entry point
+    // Call the application's entry point.
     //
     main();
-    for(;;){}
 }
 
 //*****************************************************************************
@@ -321,12 +322,14 @@ void ResetISR(void) {
 // by a debugger.
 //
 //*****************************************************************************
-static void NmiSR(void) {
+static void
+NmiSR(void)
+{
     //
     // Enter an infinite loop.
     //
-    while (1) {
-        ; // trap NMI
+    while(1)
+    {
     }
 }
 
@@ -337,12 +340,14 @@ static void NmiSR(void) {
 // for examination by a debugger.
 //
 //*****************************************************************************
-static void FaultISR(void) {
+static void
+FaultISR(void)
+{
     //
     // Enter an infinite loop.
     //
-    while (1) {
-        ; // trap FAULT
+    while(1)
+    {
     }
 }
 
@@ -353,11 +358,13 @@ static void FaultISR(void) {
 // for examination by a debugger.
 //
 //*****************************************************************************
-static void IntDefaultHandler(void) {
+static void
+IntDefaultHandler(void)
+{
     //
     // Go into an infinite loop.
     //
-    while (1) {
-        ; // trap any handler not defined
+    while(1)
+    {
     }
 }
