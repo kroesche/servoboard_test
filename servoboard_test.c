@@ -243,6 +243,7 @@ int
 main(void)
 {
     int ret;
+    int servo;  // lame TI compiler cant handle loop var declaration
 
     FPUStackingDisable();
     
@@ -287,7 +288,7 @@ main(void)
 
     /* Enter loop to initialize all the servos in the system
      */
-    for(int servo = 0; servo < NUM_SERVOS; servo++)
+    for(servo = 0; servo < NUM_SERVOS; servo++)
     {
         /* Associate each servo ID with a hardware timer (and A or B half)
          */
@@ -310,7 +311,7 @@ main(void)
     
     /* Set each servo position to 0 to start, with 100 ms delay
      */
-    for(int servo = 0; servo < NUM_SERVOS; servo++)
+    for(servo = 0; servo < NUM_SERVOS; servo++)
     {
         /* Set the servo motion rate */
         Servo_SetMotionParameters(hServo[servo], 200);
@@ -330,7 +331,7 @@ main(void)
     {
         /* Move all servos to -45 deg, with 100 ms between each servo
          */
-        for(int servo = 0; servo < NUM_SERVOS; servo++)
+        for(servo = 0; servo < NUM_SERVOS; servo++)
         {
             UpdateRGB();
             MoveOne(servo, -450);
@@ -339,7 +340,7 @@ main(void)
 
         /* Now move all servos to +45 deg, with 100 ms delay
          */
-        for(int servo = 0; servo < NUM_SERVOS; servo++)
+        for(servo = 0; servo < NUM_SERVOS; servo++)
         {
             UpdateRGB();
             MoveOne(servo, 450);
@@ -351,6 +352,7 @@ main(void)
         uint32_t bat = Servo_ReadBatteryMv();
         UARTprintf("%u.%02u V\n", bat / 1000, (bat % 1000) / 10);
     }
-    
+#ifndef ccs // prevent warning from TI ccs compiler
     return(0);
+#endif
 }

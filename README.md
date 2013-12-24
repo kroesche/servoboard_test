@@ -41,3 +41,32 @@ This is a *quick overview* of the procedure.  You should review the full test pr
 Pre-built Binary
 ================
 You can find a pre-built binary of this application in the [gcc](https://github.com/kroesche/servoboard_test/tree/master/gcc) directory.
+
+Building
+========
+
+Directory Layout
+----------------
+In order to set up a project to build this project, I have to assume a directory layout.  You can change this around however you like, but this is how the current Makefile and project files assume the layout:
+
+* DEV_ROOT (some directory you use for development)
+** servoboard_test (this repository)
+** stellaris_drivers (dependent repository containing servo driver)
+
+The stellaris_drivers repository contains the servo-wt driver (.c and .h) that are needed for this project.  You can lay out both repositories as shown above, or you can just take the servo-wt driver source files and add them to this project.
+
+This project also assumes that TivaWare is present somewhere.  You use a build variable named TIVAWARE_ROOT to point to the location.  You can also use StellarisWare instead of TivaWare but you will need to change some other variables ... see the comments in the Makefile for details.
+
+Makefile
+--------
+You can use the Makefile if you prefer command line builds.  This works on Mac or Linux and possibly windows if you install cygwin.  You must have the GCC arm-none-eabi- toolchain installed somewhere.
+
+**Build Variables** (in Makefile)
+
+* TIVAWARE_ROOT (where you installed TivaWare)
+* USE_STELLARISWARE (if you want to use StellarisWare instead of TivaWare - see comments)
+* TOOLPATH (where you installed the ARM compiler)
+
+Code Composer Studio
+--------------------
+I also created a CCS project.  I only tested this on Windows XP.  The project is located in the directory named “ccs”.  You should import this project into your workspace.  You will need to tell it where to find TivaWare by setting the location using TIVAWARE_ROOT.  You can set this from the project Properties.  Go to Resource—>Linked Resources, and edit the Path Variable named TIVAWARE_ROOT.
