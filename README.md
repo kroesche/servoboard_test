@@ -49,13 +49,14 @@ Directory Layout
 ----------------
 In order to set up a project to build this project, I have to assume a directory layout.  You can change this around however you like, but this is how the current Makefile and project files assume the layout:
 
-* DEV_ROOT (some directory you use for development)
-** servoboard_test (this repository)
-** stellaris_drivers (dependent repository containing servo driver)
+    DEV_ROOT (some directory you use for development)
+    |
+    /----servoboard_test (this repository)
+    /----stellaris_drivers (dependent repository containing servo driver)
 
 The stellaris_drivers repository contains the servo-wt driver (.c and .h) that are needed for this project.  You can lay out both repositories as shown above, or you can just take the servo-wt driver source files and add them to this project.
 
-This project also assumes that TivaWare is present somewhere.  You use a build variable named TIVAWARE_ROOT to point to the location.  You can also use StellarisWare instead of TivaWare but you will need to change some other variables ... see the comments in the Makefile for details.
+This project also assumes that TivaWare is present somewhere.  You use a build variable named **TIVAWARE_ROOT** to point to the location.  You can also use StellarisWare instead of TivaWare but you will need to change some other variables ... see the comments in the Makefile for details.
 
 Makefile
 --------
